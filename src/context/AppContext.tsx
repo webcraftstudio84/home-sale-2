@@ -127,8 +127,8 @@ interface AppContextType {
   favoriteShopIds: string[];
 
   // Views & Navigation
-  customerView: 'home' | 'shops' | 'shop-details' | 'checkout' | 'order-tracking' | 'order-history' | 'profile';
-  setCustomerView: (view: 'home' | 'shops' | 'shop-details' | 'checkout' | 'order-tracking' | 'order-history' | 'profile') => void;
+  customerView: 'home' | 'shops' | 'categories' | 'favorites' | 'shop-details' | 'checkout' | 'order-tracking' | 'order-history' | 'profile';
+  setCustomerView: (view: 'home' | 'shops' | 'categories' | 'favorites' | 'shop-details' | 'checkout' | 'order-tracking' | 'order-history' | 'profile') => void;
   selectedShopId: string | null;
   setSelectedShopId: (id: string | null) => void;
   selectedProduct: Product | null;
@@ -189,13 +189,52 @@ interface AppContextType {
   updateDeliveryProgress: (orderId: string, status: 'Picked Up' | 'Out for Delivery' | 'Delivered') => void;
 
   // Admin Actions
-  adminAddShop: (shop: Omit<Shop, 'id' | 'rating' | 'reviewCount'>) => void;
+  adminAddShop: (shop: Omit<Shop, 'id' | 'rating' | 'reviewCount'> | {
+    name: string;
+    category: string;
+    description: string;
+    address: string;
+    area: string;
+    city: string;
+    pincode: string;
+    phone: string;
+    openingTime: string;
+    closingTime: string;
+    logo?: string;
+    banner?: string;
+    tagline?: string;
+    deliveryCharge?: number;
+    estimatedDeliveryTime?: string;
+    assignedShopkeeper?: {
+      name: string;
+      phone: string;
+      email: string;
+      username: string;
+      password?: string;
+    };
+  }) => Shop;
+  adminEditShop: (shopId: string, updates: Partial<Shop>) => void;
   adminUpdateShopStatus: (shopId: string, status: 'active' | 'pending' | 'suspended') => void;
   adminDeleteShop: (shopId: string) => void;
+  adminAssignShopkeeper: (
+    shopId: string,
+    data: { name: string; phone: string; email: string; username: string; password?: string }
+  ) => void;
   adminAddDeliveryZone: (zone: Omit<DeliveryZone, 'id'>) => void;
   adminUpdateDeliveryZone: (id: string, zone: Partial<DeliveryZone>) => void;
   adminDeleteDeliveryZone: (id: string) => void;
+  adminAddDeliveryPartner: (data: {
+    name: string;
+    phone: string;
+    email: string;
+    vehicleType: 'Bike' | 'Scooter' | 'Bicycle' | 'EV';
+    vehicleNumber: string;
+    preferredArea: string;
+    username: string;
+    password?: string;
+  }) => void;
   adminUpdateDeliveryPartner: (id: string, updates: Partial<DeliveryPartner>) => void;
+  adminDeleteDeliveryPartner: (id: string) => void;
 
   // Toasts
   toasts: ToastMessage[];
@@ -1325,16 +1364,139 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   // Admin Actions
-  const adminAddShop = (newShop: Omit<Shop, 'id' | 'rating' | 'reviewCount'>) => {
+  const adminAddShop = (newShop: any): Shop => {
     const id = 'shop-' + Date.now();
+    const ownerId = newShop.assignedShopkeeper?.username ? 'user-shopkeeper-' + Date.now() : 'user-shopkeeper-' + id;
+    const ownerName = newShop.assignedShopkeeper?.name || newShop.ownerName || 'Assigned Shopkeeper';
+    const ownerPhone = newShop.assignedShopkeeper?.phone || newShop.ownerPhone || newShop.phone;
+    const ownerEmail = newShop.assignedShopkeeper?.email || newShop.ownerEmail || `${newShop.name.toLowerCase().replace(/[^a-z0-9]/g, '')}@homesale.in`;
+    const username = newShop.assignedShopkeeper?.username || newShop.username || `${newShop.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}_owner`;
+    const password = newShop.assignedShopkeeper?.password || newShop.password || 'shop@123';
+
     const created: Shop = {
-      ...newShop,
       id,
+      name: newShop.name,
+      tagline: newShop.tagline || `Quality ${newShop.category} delivered fast`,
+      description: newShop.description || 'Verified local shop on HOMESALE marketplace.',
+      category: newShop.category,
+      logo: newShop.logo || 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=200&q=80',
+      banner: newShop.banner || 'https://images.unsplash.com/photo-1578916171728-46686eac8d58?auto=format&fit=crop&w=1000&q=80',
+      rating: 5.0,
+      reviewCount: 1,
+      isOpen: true,
+      openingTime: newShop.openingTime || '07:00 AM',
+      closingTime: newShop.closingTime || '10:00 PM',
+      estimatedDeliveryTime: newShop.estimatedDeliveryTime || '20-30 min',
+      distanceKm: 1.2,
+      deliveryCharge: newShop.deliveryCharge || 25,
+      address: newShop.address,
+      area: newShop.area,
+      city: newShop.city,
+      pincode: newShop.pincode,
+      phone: newShop.phone,
+      isVerified: true,
+      status: 'active',
+      ownerId,
+      ownerName,
+      ownerEmail,
+      ownerPhone,
+      username,
+      password,
+      registeredAt: new Date().toISOString(),
+    };
+
+    // Register linked shopkeeper account so they can log in
+    const shopkeeperUser: User = {
+      id: ownerId,
+      name: ownerName,
+      phone: ownerPhone,
+      email: ownerEmail,
+      role: 'shopkeeper',
+      shopId: id,
+      username,
+      password,
+      approvalStatus: 'active',
+      registeredAt: new Date().toISOString(),
+      avatarUrl: created.logo,
+    };
+
+    // Create a starter product for the shop
+    const starterProduct: Product = {
+      id: `prod-${Date.now()}-1`,
+      shopId: id,
+      name: `${created.name} Best Seller Item`,
+      description: `Premium quality ${created.category} item directly from ${created.name}`,
+      category: created.category,
+      price: 120,
+      originalPrice: 150,
+      unit: '1 Standard Unit',
+      image: created.logo,
+      inStock: true,
+      stockQuantity: 40,
+      isVeg: true,
+      isFeatured: true,
       rating: 5.0,
       reviewCount: 1,
     };
+
     setShops((prev) => [created, ...prev]);
-    addToast('success', 'Shop Added', `${created.name} registered into HOMESALE.`);
+    setUsers((prev) => [shopkeeperUser, ...prev]);
+    setProducts((prev) => [starterProduct, ...prev]);
+    addToast('success', 'Shop Created & Assigned', `${created.name} registered into HOMESALE. Shopkeeper login: ${username}`);
+    return created;
+  };
+
+  const adminEditShop = (shopId: string, updates: Partial<Shop>) => {
+    setShops((prev) =>
+      prev.map((s) => (s.id === shopId ? { ...s, ...updates } : s))
+    );
+    addToast('success', 'Shop Updated', 'Shop information updated successfully.');
+  };
+
+  const adminAssignShopkeeper = (
+    shopId: string,
+    data: { name: string; phone: string; email: string; username: string; password?: string }
+  ) => {
+    const shop = shops.find((s) => s.id === shopId);
+    if (!shop) return;
+    const ownerId = 'user-shopkeeper-' + Date.now();
+    const password = data.password || 'shop@123';
+
+    setShops((prev) =>
+      prev.map((s) =>
+        s.id === shopId
+          ? {
+              ...s,
+              ownerId,
+              ownerName: data.name,
+              ownerPhone: data.phone,
+              ownerEmail: data.email,
+              username: data.username,
+              password,
+            }
+          : s
+      )
+    );
+
+    const newUser: User = {
+      id: ownerId,
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      role: 'shopkeeper',
+      shopId,
+      username: data.username,
+      password,
+      approvalStatus: 'active',
+      registeredAt: new Date().toISOString(),
+    };
+
+    setUsers((prev) => {
+      const filtered = prev.filter((u) => u.username !== data.username);
+      return [newUser, ...filtered];
+    });
+
+    addToast('success', 'Shopkeeper Assigned', `${data.name} (${data.username}) is now managing ${shop.name}`);
   };
 
   const adminUpdateShopStatus = (shopId: string, status: 'active' | 'pending' | 'suspended') => {
@@ -1346,7 +1508,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const adminDeleteShop = (shopId: string) => {
     setShops((prev) => prev.filter((s) => s.id !== shopId));
-    addToast('warning', 'Shop Removed', 'Shop has been deleted from platform.');
+    setProducts((prev) => prev.filter((p) => p.shopId !== shopId));
+    setUsers((prev) =>
+      prev.map((u) => (u.shopId === shopId ? { ...u, shopId: undefined } : u))
+    );
+    addToast('warning', 'Shop Removed', 'Shop and associated products deleted.');
   };
 
   const adminAddDeliveryZone = (zone: Omit<DeliveryZone, 'id'>) => {
@@ -1368,11 +1534,69 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addToast('info', 'Delivery Zone Deleted');
   };
 
+  const adminAddDeliveryPartner = (data: {
+    name: string;
+    phone: string;
+    email: string;
+    vehicleType: 'Bike' | 'Scooter' | 'Bicycle' | 'EV';
+    vehicleNumber: string;
+    preferredArea: string;
+    username: string;
+    password?: string;
+  }) => {
+    const id = 'user-delivery-' + Date.now();
+    const password = data.password || 'rider@123';
+
+    const newPartner: DeliveryPartner = {
+      id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      vehicleType: data.vehicleType,
+      vehicleNumber: data.vehicleNumber,
+      preferredArea: data.preferredArea,
+      rating: 5.0,
+      totalDeliveries: 0,
+      status: 'active',
+      approvalStatus: 'active',
+      todayEarnings: 0,
+      totalEarnings: 0,
+      username: data.username,
+      password,
+      avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=120&q=80',
+    };
+
+    const newUser: User = {
+      id,
+      name: data.name,
+      phone: data.phone,
+      email: data.email,
+      role: 'delivery',
+      username: data.username,
+      password,
+      approvalStatus: 'active',
+      registeredAt: new Date().toISOString(),
+      vehicleType: data.vehicleType,
+      vehicleNumber: data.vehicleNumber,
+      preferredArea: data.preferredArea,
+    };
+
+    setDeliveryPartners((prev) => [newPartner, ...prev]);
+    setUsers((prev) => [newUser, ...prev]);
+    addToast('success', 'Delivery Partner Added', `${data.name} registered with username ${data.username}`);
+  };
+
   const adminUpdateDeliveryPartner = (id: string, updates: Partial<DeliveryPartner>) => {
     setDeliveryPartners((prev) =>
       prev.map((dp) => (dp.id === id ? { ...dp, ...updates } : dp))
     );
     addToast('success', 'Delivery Partner Updated');
+  };
+
+  const adminDeleteDeliveryPartner = (id: string) => {
+    setDeliveryPartners((prev) => prev.filter((dp) => dp.id !== id));
+    setUsers((prev) => prev.filter((u) => u.id !== id));
+    addToast('info', 'Delivery Partner Removed', 'Rider deleted from platform.');
   };
 
   return (
@@ -1464,12 +1688,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         acceptDelivery,
         updateDeliveryProgress,
         adminAddShop,
+        adminEditShop,
+        adminAssignShopkeeper,
         adminUpdateShopStatus,
         adminDeleteShop,
         adminAddDeliveryZone,
         adminUpdateDeliveryZone,
         adminDeleteDeliveryZone,
+        adminAddDeliveryPartner,
         adminUpdateDeliveryPartner,
+        adminDeleteDeliveryPartner,
         toasts,
         addToast,
         removeToast,

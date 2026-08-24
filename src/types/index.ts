@@ -201,7 +201,7 @@ export interface DeliveryPartner {
   status: 'active' | 'on_delivery' | 'offline';
   approvalStatus?: AccountStatus;
   currentOrderId?: string;
-  avatarUrl: string;
+  avatarUrl?: string;
   username?: string;
   password?: string;
   address?: string;
