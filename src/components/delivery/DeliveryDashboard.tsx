@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   Power,
   PackageCheck,
+  LogOut,
+  AlertTriangle,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 
@@ -22,6 +24,8 @@ export const DeliveryDashboard: React.FC = () => {
     acceptDelivery,
     updateDeliveryProgress,
     currentUser,
+    logoutUser,
+    setAuthView,
   } = useApp();
 
   const [isOnline, setIsOnline] = useState(true);
@@ -35,6 +39,7 @@ export const DeliveryDashboard: React.FC = () => {
     totalDeliveries: 148,
     vehicleType: 'EV',
     todayEarnings: 450,
+    approvalStatus: 'active' as const,
   };
 
   // Orders available for pickup (Ready for Pickup or Shopkeeper Accepted and unassigned)
@@ -94,25 +99,72 @@ export const DeliveryDashboard: React.FC = () => {
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              {rider.vehicleType} Fleet • {rider.rating} ★ ({rider.totalDeliveries} Deliveries) • Zone: Koramangala
+              {rider.vehicleType} Fleet • {rider.rating} ★ ({rider.totalDeliveries} Deliveries) • Zone: {rider.preferredArea || 'Koramangala'}
             </p>
           </div>
         </div>
 
-        {/* Online / Offline switch */}
-        <button
-          type="button"
-          onClick={() => setIsOnline(!isOnline)}
-          className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
-            isOnline
-              ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-              : 'bg-slate-800 hover:bg-slate-900 text-slate-200'
-          }`}
-        >
-          <Power className="w-4 h-4" />
-          <span>{isOnline ? 'ONLINE (Ready for Tasks)' : 'OFFLINE (Resting)'}</span>
-        </button>
+        {/* Online / Offline switch & Logout */}
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setIsOnline(!isOnline)}
+            className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-xs flex items-center gap-2 cursor-pointer ${
+              isOnline
+                ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                : 'bg-slate-800 hover:bg-slate-900 text-slate-200'
+            }`}
+          >
+            <Power className="w-4 h-4" />
+            <span>{isOnline ? 'ONLINE' : 'OFFLINE'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              logoutUser();
+              setAuthView(null);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+            title="Logout"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-500" />
+            <span>Logout</span>
+          </button>
+        </div>
       </div>
+
+      {/* Rider Status Verification Notice */}
+      {rider.approvalStatus === 'pending' && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-center gap-3 text-amber-900 text-xs">
+          <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+          <div className="flex-1">
+            <p className="font-bold text-amber-950">Rider Application Pending Approval</p>
+            <p className="text-amber-800 text-[11px] mt-0.5">
+              Your vehicle and identity documents are under admin review. Once approved, you can accept local delivery tasks.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAuthView('admin-login')}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[11px] shrink-0 cursor-pointer shadow-xs"
+          >
+            Switch to Admin
+          </button>
+        </div>
+      )}
+
+      {rider.approvalStatus === 'suspended' && (
+        <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 flex items-center gap-3 text-rose-900 text-xs">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+          <div>
+            <p className="font-bold text-rose-950">Partner Account Suspended</p>
+            <p className="text-rose-800 text-[11px] mt-0.5">
+              This rider account has been temporarily paused by operations management.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

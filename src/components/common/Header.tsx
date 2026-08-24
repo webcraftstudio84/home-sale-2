@@ -37,6 +37,9 @@ export const Header: React.FC = () => {
     shops,
     setSelectedProduct,
     setSelectedShopId,
+    authView,
+    setAuthView,
+    logoutUser,
   } = useApp();
 
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
@@ -109,6 +112,7 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-4 shrink-0">
             <button
               onClick={() => {
+                setAuthView(null);
                 if (currentRole === 'customer') {
                   setCustomerView('home');
                   setSelectedShopId(null);
@@ -131,7 +135,7 @@ export const Header: React.FC = () => {
             </button>
 
             {/* Location Selector (Customer view) */}
-            {currentRole === 'customer' && (
+            {currentRole === 'customer' && !authView && (
               <button
                 type="button"
                 onClick={() => setIsLocationModalOpen(true)}
@@ -278,82 +282,169 @@ export const Header: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all shadow-xs ${currentRoleInfo.bg}`}
+                className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                  authView ? 'bg-slate-900 text-white border-slate-700' : currentRoleInfo.bg
+                }`}
               >
                 <RoleIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">{currentRoleInfo.label}</span>
+                <span className="hidden sm:inline">
+                  {authView ? 'Auth Portal' : currentRoleInfo.label}
+                </span>
                 <ChevronDown className="w-3 h-3 opacity-70" />
               </button>
 
-              {/* Role Dropdown */}
+              {/* Role & Auth Dropdown */}
               <AnimatePresence>
                 {isRoleMenuOpen && (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.95, y: 5 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 5 }}
-                    className="absolute right-0 mt-2 w-52 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 p-1.5 space-y-1"
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 p-2 space-y-1.5"
                   >
-                    <div className="px-3 py-2 border-b border-slate-100">
-                      <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Switch Demo Role</p>
-                      <p className="text-xs text-slate-600 font-medium">Test multi-role workflows</p>
+                    <div className="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
+                      <div>
+                        <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">HOMESALE Roles</p>
+                        <p className="text-[11px] text-slate-600 font-medium">Quick switch or authenticated access</p>
+                      </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchRole('customer');
-                        setIsRoleMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors ${
-                        currentRole === 'customer' ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <UserCheck className="w-4 h-4 text-emerald-600" />
-                      <span>Customer App</span>
-                    </button>
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthView(null);
+                          switchRole('customer');
+                          setIsRoleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                          currentRole === 'customer' && !authView ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-bold text-slate-900">Customer Store</p>
+                          <p className="text-[10px] text-slate-400">Browse & order local goods</p>
+                        </div>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchRole('shopkeeper');
-                        setIsRoleMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors ${
-                        currentRole === 'shopkeeper' ? 'bg-amber-50 text-amber-800' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <Store className="w-4 h-4 text-amber-600" />
-                      <span>Shopkeeper Dashboard</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthView(null);
+                          switchRole('shopkeeper');
+                          setIsRoleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                          currentRole === 'shopkeeper' && !authView ? 'bg-amber-50 text-amber-800' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <Store className="w-4 h-4 text-amber-600 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-bold text-slate-900">Shopkeeper Dashboard</p>
+                          <p className="text-[10px] text-slate-400">Manage store orders & catalog</p>
+                        </div>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchRole('delivery');
-                        setIsRoleMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors ${
-                        currentRole === 'delivery' ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <Bike className="w-4 h-4 text-blue-600" />
-                      <span>Delivery Partner App</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthView(null);
+                          switchRole('delivery');
+                          setIsRoleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                          currentRole === 'delivery' && !authView ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <Bike className="w-4 h-4 text-blue-600 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-bold text-slate-900">Delivery Partner App</p>
+                          <p className="text-[10px] text-slate-400">Live order pickup & routes</p>
+                        </div>
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        switchRole('admin');
-                        setIsRoleMenuOpen(false);
-                      }}
-                      className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors ${
-                        currentRole === 'admin' ? 'bg-purple-50 text-purple-800' : 'hover:bg-slate-50 text-slate-700'
-                      }`}
-                    >
-                      <Shield className="w-4 h-4 text-purple-600" />
-                      <span>Admin Management</span>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthView(null);
+                          switchRole('admin');
+                          setIsRoleMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
+                          currentRole === 'admin' && !authView ? 'bg-purple-50 text-purple-800' : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <Shield className="w-4 h-4 text-purple-600 shrink-0" />
+                        <div className="flex-1">
+                          <p className="font-bold text-slate-900">Admin Console</p>
+                          <p className="text-[10px] text-slate-400">Approvals & zones moderation</p>
+                        </div>
+                      </button>
+                    </div>
+
+                    <div className="pt-2 border-t border-slate-100 space-y-1">
+                      <p className="px-2.5 text-[9px] uppercase font-extrabold tracking-wider text-slate-400">
+                        Dedicated Login & Signup Pages
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-1 px-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthView('admin-login');
+                            setIsRoleMenuOpen(false);
+                          }}
+                          className="py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
+                        >
+                          Admin Login
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthView('shopkeeper-register');
+                            setIsRoleMenuOpen(false);
+                          }}
+                          className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
+                        >
+                          List Shop
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthView('shopkeeper-login');
+                            setIsRoleMenuOpen(false);
+                          }}
+                          className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
+                        >
+                          Shopkeeper Login
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAuthView('delivery-register');
+                            setIsRoleMenuOpen(false);
+                          }}
+                          className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
+                        >
+                          Join Delivery
+                        </button>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthView('role-hub');
+                          setIsRoleMenuOpen(false);
+                        }}
+                        className="w-full mt-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-bold text-center cursor-pointer transition-colors block"
+                      >
+                        Browse All Role Portals →
+                      </button>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>

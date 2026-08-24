@@ -28,8 +28,16 @@ import { ShopkeeperDashboard } from './components/shopkeeper/ShopkeeperDashboard
 import { DeliveryDashboard } from './components/delivery/DeliveryDashboard';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 
+// Authentication Pages
+import { AdminLoginPage } from './components/auth/AdminLoginPage';
+import { ShopkeeperLoginPage } from './components/auth/ShopkeeperLoginPage';
+import { ShopkeeperRegisterPage } from './components/auth/ShopkeeperRegisterPage';
+import { DeliveryLoginPage } from './components/auth/DeliveryLoginPage';
+import { DeliveryRegisterPage } from './components/auth/DeliveryRegisterPage';
+import { RolePortalHub } from './components/auth/RolePortalHub';
+
 const AppContent: React.FC = () => {
-  const { currentRole, customerView } = useApp();
+  const { currentRole, customerView, authView } = useApp();
 
   const renderCustomerView = () => {
     switch (customerView) {
@@ -52,7 +60,30 @@ const AppContent: React.FC = () => {
     }
   };
 
+  const renderAuthView = () => {
+    switch (authView) {
+      case 'admin-login':
+        return <AdminLoginPage />;
+      case 'shopkeeper-login':
+        return <ShopkeeperLoginPage />;
+      case 'shopkeeper-register':
+        return <ShopkeeperRegisterPage />;
+      case 'delivery-login':
+        return <DeliveryLoginPage />;
+      case 'delivery-register':
+        return <DeliveryRegisterPage />;
+      case 'role-hub':
+        return <RolePortalHub />;
+      default:
+        return null;
+    }
+  };
+
   const renderMainView = () => {
+    if (authView) {
+      return renderAuthView();
+    }
+
     switch (currentRole) {
       case 'shopkeeper':
         return <ShopkeeperDashboard />;

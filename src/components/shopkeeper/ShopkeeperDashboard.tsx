@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Search,
   Filter,
+  LogOut,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -28,6 +29,9 @@ export const ShopkeeperDashboard: React.FC = () => {
     products,
     orders,
     shopkeeperShop,
+    currentUser,
+    logoutUser,
+    setAuthView,
     updateShopProfile,
     updateOrderStatus,
     addProduct,
@@ -209,8 +213,54 @@ export const ShopkeeperDashboard: React.FC = () => {
             <Power className="w-3.5 h-3.5" />
             <span>{currentShop.isOpen ? 'Store is OPEN' : 'Store is CLOSED'}</span>
           </button>
+
+          {/* Logout Button */}
+          <button
+            type="button"
+            onClick={() => {
+              logoutUser();
+              setAuthView(null);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-rose-50 hover:text-rose-700 border border-slate-200 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+            title="Logout from Shopkeeper Portal"
+          >
+            <LogOut className="w-3.5 h-3.5 text-rose-500" />
+            <span>Logout</span>
+          </button>
         </div>
       </div>
+
+      {/* Account Verification Status Notice */}
+      {currentShop.status === 'pending' && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-center gap-3 text-amber-900 text-xs">
+          <Clock className="w-5 h-5 text-amber-600 shrink-0" />
+          <div className="flex-1">
+            <p className="font-bold text-amber-950">Shop Application Pending Admin Verification</p>
+            <p className="text-amber-800 text-[11px] mt-0.5">
+              Your store is submitted and waiting for administrator verification. You can prepare catalog products; your shop will become live in customer search once approved.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAuthView('admin-login')}
+            className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[11px] shrink-0 cursor-pointer shadow-xs"
+          >
+            Switch to Admin to Approve
+          </button>
+        </div>
+      )}
+
+      {currentShop.status === 'suspended' && (
+        <div className="bg-rose-50 border border-rose-300 rounded-2xl p-4 flex items-center gap-3 text-rose-900 text-xs">
+          <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0" />
+          <div>
+            <p className="font-bold text-rose-950">Shop Suspended by Platform Admin</p>
+            <p className="text-rose-800 text-[11px] mt-0.5">
+              This shop is currently inactive in search. Please contact platform support or admin for resolution.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

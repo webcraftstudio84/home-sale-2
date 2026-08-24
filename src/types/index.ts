@@ -1,5 +1,7 @@
 export type UserRole = 'customer' | 'shopkeeper' | 'delivery' | 'admin';
 
+export type AccountStatus = 'pending' | 'active' | 'suspended' | 'rejected';
+
 export interface User {
   id: string;
   name: string;
@@ -8,6 +10,15 @@ export interface User {
   role: UserRole;
   avatarUrl?: string;
   shopId?: string; // If shopkeeper
+  username?: string;
+  password?: string;
+  approvalStatus?: AccountStatus;
+  registeredAt?: string;
+  address?: string;
+  vehicleType?: 'Bike' | 'Scooter' | 'Bicycle' | 'EV';
+  vehicleNumber?: string;
+  preferredArea?: string;
+  rejectionReason?: string;
 }
 
 export interface Address {
@@ -73,8 +84,15 @@ export interface Shop {
   pincode: string;
   phone: string;
   isVerified: boolean;
-  status: 'active' | 'pending' | 'suspended';
+  status: AccountStatus;
   ownerId?: string;
+  ownerName?: string;
+  ownerEmail?: string;
+  ownerPhone?: string;
+  username?: string;
+  password?: string;
+  registeredAt?: string;
+  rejectionReason?: string;
 }
 
 export interface CartItem {
@@ -181,8 +199,15 @@ export interface DeliveryPartner {
   todayEarnings: number;
   totalEarnings: number;
   status: 'active' | 'on_delivery' | 'offline';
+  approvalStatus?: AccountStatus;
   currentOrderId?: string;
   avatarUrl: string;
+  username?: string;
+  password?: string;
+  address?: string;
+  preferredArea?: string;
+  registeredAt?: string;
+  rejectionReason?: string;
 }
 
 export interface ToastMessage {
