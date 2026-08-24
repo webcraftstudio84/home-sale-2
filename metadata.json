@@ -1,0 +1,6 @@
+{
+  "name": "HOMESALE",
+  "description": "Hyperlocal marketplace connecting customers with local neighborhood shops for lightning-fast deliveries.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
