@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { HeroBanner } from './HeroBanner';
 import { CategoryBar } from './CategoryBar';
 import { ShopCard } from './ShopCard';
+import { ProductSearchBar } from './ProductSearchBar';
 import {
   Sparkles,
   Store,
@@ -41,10 +42,18 @@ export const HomePage: React.FC = () => {
       {/* 1. Hero Promotional Banner */}
       <HeroBanner />
 
-      {/* 2. Shop by Category */}
+      {/* 2. Interactive Product Search Bar */}
+      <section className="space-y-2">
+        <ProductSearchBar
+          placeholder="Search 1,000+ local products (e.g. Milk, Rice, Fruits, Maggi, Paneer, Soap)..."
+          showTrendingPills={true}
+        />
+      </section>
+
+      {/* 3. Shop by Category */}
       <CategoryBar />
 
-      {/* 3. Featured / Top Rated Stores */}
+      {/* 4. Featured / Top Rated Stores */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <div>

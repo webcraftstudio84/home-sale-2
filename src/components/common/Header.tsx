@@ -15,6 +15,8 @@ import {
   Sparkles,
   ArrowRight,
   SlidersHorizontal,
+  Plus,
+  Tag,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,6 +25,7 @@ export const Header: React.FC = () => {
     location,
     setIsLocationModalOpen,
     cart,
+    addToCart,
     setIsCartDrawerOpen,
     currentUser,
     currentRole,
@@ -44,7 +47,9 @@ export const Header: React.FC = () => {
 
   const [isRoleMenuOpen, setIsRoleMenuOpen] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const searchContainerRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Close search dropdown on click outside
   useEffect(() => {
@@ -65,19 +70,26 @@ export const Header: React.FC = () => {
     : [];
 
   const matchingProducts = searchQuery.trim()
-    ? products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 5)
+    ? products.filter((p) => p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.category.toLowerCase().includes(searchQuery.toLowerCase()) || p.description.toLowerCase().includes(searchQuery.toLowerCase())).slice(0, 6)
     : [];
 
   const handleSelectSearchedShop = (shopId: string) => {
     setSelectedShopId(shopId);
     setCustomerView('shop-details');
     setIsSearchFocused(false);
+    setIsMobileSearchOpen(false);
     setSearchQuery('');
   };
 
   const handleSelectSearchedProduct = (product: any) => {
     setSelectedProduct(product);
     setIsSearchFocused(false);
+    setIsMobileSearchOpen(false);
+  };
+
+  const handleAddProductFromSearch = (e: React.MouseEvent, product: any) => {
+    e.stopPropagation();
+    addToCart(product, 1);
   };
 
   const getRoleBadge = (role: UserRole) => {
@@ -98,14 +110,6 @@ export const Header: React.FC = () => {
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80 shadow-xs">
-      {/* Top micro banner for Hyperlocal Guarantee */}
-      <div className="bg-slate-900 text-slate-200 text-[11px] font-medium py-1 px-4 text-center flex items-center justify-center gap-2 border-b border-slate-800">
-        <Sparkles className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-        <span>
-          <strong className="text-white">HOMESALE</strong> • Neighborhood stores & fresh essentials delivered in 15–30 mins!
-        </span>
-      </div>
-
       <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-3 sm:gap-6">
           {/* Logo & Brand */}
@@ -159,7 +163,7 @@ export const Header: React.FC = () => {
             )}
           </div>
 
-          {/* Search Bar (Customer Mode) */}
+          {/* Search Bar (Customer Mode - Desktop) */}
           {currentRole === 'customer' ? (
             <div ref={searchContainerRef} className="flex-1 max-w-lg relative hidden sm:block">
               <div className="relative">
@@ -168,10 +172,10 @@ export const Header: React.FC = () => {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setIsSearchFocused(true)}
-                  placeholder="Search for groceries, shops, milk, fruits, medicines..."
+                  placeholder="Search products, groceries, milk, fruits, medicines..."
                   className="w-full pl-10 pr-9 py-2 text-xs sm:text-sm bg-slate-100/90 border border-slate-200/80 rounded-xl focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none transition-all placeholder:text-slate-400 text-slate-900"
                 />
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                <Search className="w-4 h-4 text-emerald-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
                 {searchQuery && (
                   <button
                     type="button"
@@ -190,7 +194,7 @@ export const Header: React.FC = () => {
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 5 }}
-                    className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 p-2 space-y-3"
+                    className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-50 p-2 space-y-3 max-h-[75vh] overflow-y-auto"
                   >
                     {matchingShops.length === 0 && matchingProducts.length === 0 ? (
                       <div className="p-4 text-center text-xs text-slate-500">
@@ -198,8 +202,61 @@ export const Header: React.FC = () => {
                       </div>
                     ) : (
                       <>
-                        {matchingShops.length > 0 && (
+                        {matchingProducts.length > 0 && (
                           <div>
+                            <div className="flex items-center justify-between px-2.5 mb-1">
+                              <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">
+                                Products ({matchingProducts.length})
+                              </p>
+                              <span className="text-[10px] text-emerald-700 font-semibold">Instant Add</span>
+                            </div>
+                            <div className="space-y-1">
+                              {matchingProducts.map((prod) => {
+                                const shop = shops.find((s) => s.id === prod.shopId);
+                                return (
+                                  <div
+                                    key={prod.id}
+                                    onClick={() => handleSelectSearchedProduct(prod)}
+                                    className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 text-left transition-colors text-xs cursor-pointer group"
+                                  >
+                                    <div className="relative w-9 h-9 rounded-lg overflow-hidden border border-slate-200 shrink-0 bg-slate-100">
+                                      <img
+                                        src={prod.image}
+                                        alt={prod.name}
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="font-bold text-slate-900 truncate group-hover:text-emerald-700">
+                                        {prod.name}
+                                      </p>
+                                      <p className="text-[11px] text-slate-500 truncate">
+                                        {prod.unit} • <span className="font-extrabold text-emerald-700">₹{prod.price}</span>
+                                        {shop && (
+                                          <span className="text-slate-400"> • {shop.name}</span>
+                                        )}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleAddProductFromSearch(e, prod)}
+                                        className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white font-bold rounded-lg text-[11px] transition-colors border border-emerald-600/30 flex items-center gap-1"
+                                        title="Add to Cart"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                        <span>Add</span>
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
+
+                        {matchingShops.length > 0 && (
+                          <div className="border-t border-slate-100 pt-2">
                             <p className="text-[10px] font-bold uppercase text-slate-400 px-2.5 mb-1 tracking-wider">
                               Shops
                             </p>
@@ -228,39 +285,6 @@ export const Header: React.FC = () => {
                             </div>
                           </div>
                         )}
-
-                        {matchingProducts.length > 0 && (
-                          <div className="border-t border-slate-100 pt-2">
-                            <p className="text-[10px] font-bold uppercase text-slate-400 px-2.5 mb-1 tracking-wider">
-                              Products
-                            </p>
-                            <div className="space-y-1">
-                              {matchingProducts.map((prod) => (
-                                <button
-                                  key={prod.id}
-                                  type="button"
-                                  onClick={() => handleSelectSearchedProduct(prod)}
-                                  className="w-full flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 text-left transition-colors text-xs"
-                                >
-                                  <img
-                                    src={prod.image}
-                                    alt={prod.name}
-                                    className="w-8 h-8 rounded-lg object-cover border border-slate-200"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-slate-900 truncate">{prod.name}</p>
-                                    <p className="text-[11px] text-slate-500">
-                                      {prod.unit} • <span className="font-bold text-emerald-700">₹{prod.price}</span>
-                                    </p>
-                                  </div>
-                                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
-                                    View
-                                  </span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
                       </>
                     )}
                   </motion.div>
@@ -268,29 +292,50 @@ export const Header: React.FC = () => {
               </AnimatePresence>
             </div>
           ) : (
-            <div className="flex-1 text-center sm:text-left">
-              <span className="text-xs sm:text-sm font-bold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg border border-slate-200">
-                Active Portal: {currentRoleInfo.label} Management
+            <div className="flex-1 min-w-0 text-center sm:text-left px-1 sm:px-2">
+              <span className="inline-block max-w-full truncate text-[11px] sm:text-xs md:text-sm font-bold text-slate-700 bg-slate-100 px-2 sm:px-3 py-1 rounded-lg border border-slate-200 align-middle">
+                <span className="hidden sm:inline">Active Portal: </span>
+                {currentRoleInfo.label}
+                <span className="hidden md:inline"> Management</span>
               </span>
             </div>
           )}
 
           {/* Right Navigation & Controls */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Mobile Search Trigger Button (Customer mode) */}
+            {currentRole === 'customer' && !authView && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileSearchOpen(!isMobileSearchOpen);
+                  setTimeout(() => mobileSearchInputRef.current?.focus(), 100);
+                }}
+                className={`sm:hidden p-2 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 ${
+                  isMobileSearchOpen || searchQuery
+                    ? 'bg-emerald-600 text-white border-emerald-600'
+                    : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                }`}
+                title="Search Products"
+              >
+                <Search className="w-4 h-4" />
+              </button>
+            )}
+
             {/* Quick Demo Role Switcher Button */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <button
                 type="button"
                 onClick={() => setIsRoleMenuOpen(!isRoleMenuOpen)}
-                className={`flex items-center gap-1.5 py-1.5 px-2.5 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                className={`flex items-center gap-1 sm:gap-1.5 py-1.5 px-2 sm:px-2.5 rounded-xl border text-xs font-bold transition-all shadow-xs cursor-pointer shrink-0 whitespace-nowrap ${
                   authView ? 'bg-slate-900 text-white border-slate-700' : currentRoleInfo.bg
                 }`}
               >
-                <RoleIcon className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">
+                <RoleIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="hidden sm:inline whitespace-nowrap">
                   {authView ? 'Auth Portal' : currentRoleInfo.label}
                 </span>
-                <ChevronDown className="w-3 h-3 opacity-70" />
+                <ChevronDown className="w-3 h-3 opacity-70 shrink-0" />
               </button>
 
               {/* Role & Auth Dropdown */}
@@ -304,9 +349,10 @@ export const Header: React.FC = () => {
                   >
                     <div className="px-2.5 py-1.5 border-b border-slate-100 flex items-center justify-between">
                       <div>
-                        <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">HOMESALE Roles</p>
-                        <p className="text-[11px] text-slate-600 font-medium">Quick switch or authenticated access</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Switch Demo Role</p>
+                        <p className="text-xs font-bold text-slate-800">4-Sided Marketplace</p>
                       </div>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded">Live Demo</span>
                     </div>
 
                     <div className="space-y-1">
@@ -317,15 +363,15 @@ export const Header: React.FC = () => {
                           switchRole('customer');
                           setIsRoleMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                          currentRole === 'customer' && !authView ? 'bg-emerald-50 text-emerald-800' : 'hover:bg-slate-50 text-slate-700'
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                          currentRole === 'customer' && !authView ? 'bg-emerald-50 text-emerald-900 font-bold border border-emerald-200' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <UserCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-900">Customer Store</p>
-                          <p className="text-[10px] text-slate-400">Browse & order local goods</p>
+                        <div className="flex items-center gap-2">
+                          <UserCheck className="w-4 h-4 text-emerald-600" />
+                          <span>Customer Portal</span>
                         </div>
+                        {currentRole === 'customer' && !authView && <span className="w-2 h-2 rounded-full bg-emerald-600" />}
                       </button>
 
                       <button
@@ -335,15 +381,15 @@ export const Header: React.FC = () => {
                           switchRole('shopkeeper');
                           setIsRoleMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                          currentRole === 'shopkeeper' && !authView ? 'bg-amber-50 text-amber-800' : 'hover:bg-slate-50 text-slate-700'
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                          currentRole === 'shopkeeper' && !authView ? 'bg-amber-50 text-amber-900 font-bold border border-amber-200' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <Store className="w-4 h-4 text-amber-600 shrink-0" />
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-900">Shopkeeper Dashboard</p>
-                          <p className="text-[10px] text-slate-400">Manage store orders & catalog</p>
+                        <div className="flex items-center gap-2">
+                          <Store className="w-4 h-4 text-amber-600" />
+                          <span>Shopkeeper Portal</span>
                         </div>
+                        {currentRole === 'shopkeeper' && !authView && <span className="w-2 h-2 rounded-full bg-amber-600" />}
                       </button>
 
                       <button
@@ -353,15 +399,15 @@ export const Header: React.FC = () => {
                           switchRole('delivery');
                           setIsRoleMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                          currentRole === 'delivery' && !authView ? 'bg-blue-50 text-blue-800' : 'hover:bg-slate-50 text-slate-700'
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                          currentRole === 'delivery' && !authView ? 'bg-blue-50 text-blue-900 font-bold border border-blue-200' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <Bike className="w-4 h-4 text-blue-600 shrink-0" />
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-900">Delivery Partner App</p>
-                          <p className="text-[10px] text-slate-400">Live order pickup & routes</p>
+                        <div className="flex items-center gap-2">
+                          <Bike className="w-4 h-4 text-blue-600" />
+                          <span>Delivery Partner</span>
                         </div>
+                        {currentRole === 'delivery' && !authView && <span className="w-2 h-2 rounded-full bg-blue-600" />}
                       </button>
 
                       <button
@@ -371,78 +417,30 @@ export const Header: React.FC = () => {
                           switchRole('admin');
                           setIsRoleMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-xs font-semibold text-left transition-colors cursor-pointer ${
-                          currentRole === 'admin' && !authView ? 'bg-purple-50 text-purple-800' : 'hover:bg-slate-50 text-slate-700'
+                        className={`w-full flex items-center justify-between p-2 rounded-xl text-left text-xs transition-colors cursor-pointer ${
+                          currentRole === 'admin' && !authView ? 'bg-purple-50 text-purple-900 font-bold border border-purple-200' : 'hover:bg-slate-50 text-slate-700'
                         }`}
                       >
-                        <Shield className="w-4 h-4 text-purple-600 shrink-0" />
-                        <div className="flex-1">
-                          <p className="font-bold text-slate-900">Admin Console</p>
-                          <p className="text-[10px] text-slate-400">Approvals & zones moderation</p>
+                        <div className="flex items-center gap-2">
+                          <Shield className="w-4 h-4 text-purple-600" />
+                          <span>Platform Admin</span>
                         </div>
+                        {currentRole === 'admin' && !authView && <span className="w-2 h-2 rounded-full bg-purple-600" />}
                       </button>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-100 space-y-1">
-                      <p className="px-2.5 text-[9px] uppercase font-extrabold tracking-wider text-slate-400">
-                        Dedicated Login & Signup Pages
-                      </p>
-
-                      <div className="grid grid-cols-2 gap-1 px-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthView('admin-login');
-                            setIsRoleMenuOpen(false);
-                          }}
-                          className="py-1.5 px-2 bg-purple-50 hover:bg-purple-100 text-purple-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
-                        >
-                          Admin Login
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthView('shopkeeper-register');
-                            setIsRoleMenuOpen(false);
-                          }}
-                          className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
-                        >
-                          List Shop
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthView('shopkeeper-login');
-                            setIsRoleMenuOpen(false);
-                          }}
-                          className="py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
-                        >
-                          Shopkeeper Login
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAuthView('delivery-register');
-                            setIsRoleMenuOpen(false);
-                          }}
-                          className="py-1.5 px-2 bg-blue-50 hover:bg-blue-100 text-blue-900 rounded-lg text-[11px] font-bold text-center cursor-pointer transition-colors"
-                        >
-                          Join Delivery
-                        </button>
-                      </div>
-
+                    {/* Portals & Credentials Hub */}
+                    <div className="border-t border-slate-100 pt-1.5 mt-1 space-y-1">
                       <button
                         type="button"
                         onClick={() => {
                           setAuthView('role-hub');
                           setIsRoleMenuOpen(false);
                         }}
-                        className="w-full mt-1 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-[11px] font-bold text-center cursor-pointer transition-colors block"
+                        className="w-full flex items-center justify-between p-2 rounded-xl text-left text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 transition-colors"
                       >
-                        Browse All Role Portals →
+                        <span>Role Portals & Logins Hub</span>
+                        <ArrowRight className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </motion.div>
@@ -450,50 +448,52 @@ export const Header: React.FC = () => {
               </AnimatePresence>
             </div>
 
-            {/* Cart Button (Customer Role) */}
-            {currentRole === 'customer' && (
+            {/* Cart Button (Customer Mode) */}
+            {currentRole === 'customer' && !authView && (
               <button
                 type="button"
                 onClick={() => setIsCartDrawerOpen(true)}
-                className="relative flex items-center gap-2 py-2 px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs text-xs cursor-pointer"
+                className="relative flex items-center gap-1.5 sm:gap-2 py-1.5 sm:py-2 px-2.5 sm:px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition-all shadow-xs text-xs cursor-pointer shrink-0 whitespace-nowrap"
               >
-                <ShoppingBag className="w-4 h-4" />
-                <span className="hidden sm:inline">Cart</span>
+                <ShoppingBag className="w-4 h-4 shrink-0" />
+                <span className="hidden sm:inline whitespace-nowrap">Cart</span>
                 {totalCartItems > 0 && (
-                  <span className="bg-white text-emerald-800 font-extrabold text-[11px] px-1.5 py-0.2 rounded-full min-w-[20px] text-center shadow-2xs">
+                  <span className="bg-white text-emerald-800 font-extrabold text-[11px] px-1.5 py-0.2 rounded-full min-w-[20px] text-center shadow-2xs shrink-0">
                     {totalCartItems}
                   </span>
                 )}
               </button>
             )}
 
-            {/* User Profile / Login */}
+            {/* User Account / Sign In */}
             {currentUser ? (
-              <button
-                type="button"
-                onClick={() => {
-                  if (currentRole === 'customer') {
-                    setCustomerView('profile');
-                  }
-                }}
-                className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors"
-                title={currentUser.name}
-              >
-                {currentUser.avatarUrl ? (
-                  <img
-                    src={currentUser.avatarUrl}
-                    alt={currentUser.name}
-                    className="w-8 h-8 rounded-xl object-cover border border-slate-200 shadow-xs"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs">
-                    {currentUser.name.charAt(0)}
-                  </div>
-                )}
-                <span className="hidden lg:inline text-xs font-semibold text-slate-800 max-w-[100px] truncate">
-                  {currentUser.name}
-                </span>
-              </button>
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (currentRole === 'customer') {
+                      setCustomerView('profile');
+                    }
+                  }}
+                  className="flex items-center gap-1.5 sm:gap-2 p-1 sm:p-1.5 rounded-xl hover:bg-slate-100 text-slate-700 transition-colors shrink-0 whitespace-nowrap"
+                  title={currentUser.name}
+                >
+                  {currentUser.avatarUrl ? (
+                    <img
+                      src={currentUser.avatarUrl}
+                      alt={currentUser.name}
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-cover border border-slate-200 shadow-xs shrink-0"
+                    />
+                  ) : (
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
+                      {currentUser.name.charAt(0)}
+                    </div>
+                  )}
+                  <span className="text-xs font-bold hidden md:inline max-w-[90px] truncate">
+                    {currentUser.name.split(' ')[0]}
+                  </span>
+                </button>
+              </div>
             ) : (
               <button
                 type="button"
@@ -501,7 +501,7 @@ export const Header: React.FC = () => {
                   setAuthModalMode('login');
                   setIsAuthModalOpen(true);
                 }}
-                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 border border-emerald-600/30 px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-colors"
+                className="text-xs font-bold text-emerald-700 hover:text-emerald-800 border border-emerald-600/30 px-2.5 sm:px-3 py-1.5 rounded-xl hover:bg-emerald-50 transition-colors shrink-0 whitespace-nowrap"
               >
                 Sign In
               </button>
@@ -509,8 +509,75 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
+        {/* Mobile Search Expandable Bar */}
+        <AnimatePresence>
+          {isMobileSearchOpen && currentRole === 'customer' && !authView && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="sm:hidden pb-3 pt-1 border-t border-slate-100 overflow-hidden"
+            >
+              <div className="relative">
+                <input
+                  ref={mobileSearchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search products, milk, fruits, groceries..."
+                  className="w-full pl-9 pr-8 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl focus:bg-white focus:border-emerald-500 focus:outline-none text-slate-900 placeholder:text-slate-400"
+                />
+                <Search className="w-4 h-4 text-emerald-600 absolute left-3 top-1/2 -translate-y-1/2" />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Mobile Quick Results List */}
+              {searchQuery.trim().length > 0 && (
+                <div className="mt-2 bg-white rounded-xl border border-slate-200 p-2 space-y-2 shadow-lg max-h-60 overflow-y-auto">
+                  {matchingProducts.length === 0 && matchingShops.length === 0 ? (
+                    <p className="text-center text-xs text-slate-500 py-2">No matching products or shops found</p>
+                  ) : (
+                    <>
+                      {matchingProducts.map((prod) => (
+                        <div
+                          key={prod.id}
+                          onClick={() => handleSelectSearchedProduct(prod)}
+                          className="flex items-center justify-between p-1.5 rounded-lg hover:bg-slate-50 text-xs cursor-pointer"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <img src={prod.image} alt={prod.name} className="w-7 h-7 rounded object-cover" />
+                            <div className="truncate">
+                              <p className="font-semibold text-slate-900 truncate">{prod.name}</p>
+                              <p className="text-[10px] text-slate-500">{prod.unit} • ₹{prod.price}</p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => handleAddProductFromSearch(e, prod)}
+                            className="px-2 py-0.5 bg-emerald-600 text-white rounded text-[10px] font-bold shrink-0 ml-2"
+                          >
+                            + Add
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                </div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Mobile Location Selector Row */}
-        {currentRole === 'customer' && (
+        {currentRole === 'customer' && !authView && (
           <div className="md:hidden pb-2.5 pt-1 flex items-center justify-between gap-2 border-t border-slate-100">
             <button
               type="button"
@@ -537,3 +604,4 @@ export const Header: React.FC = () => {
     </header>
   );
 };
+
