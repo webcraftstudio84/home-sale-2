@@ -246,7 +246,7 @@ export const ShopDetail: React.FC = () => {
           </p>
         </div>
       ) : activeCategoryTab === 'All' && !inShopSearch ? (
-        /* Categorized Sections */
+        /* Categorized Sections with 2-column mobile grid */
         <div className="space-y-8">
           {Object.entries(groupedProducts).map(([catName, prods]) => (
             <div key={catName} className="space-y-3">
@@ -257,7 +257,8 @@ export const ShopDetail: React.FC = () => {
                 <span className="text-xs text-slate-400 font-semibold">({prods.length})</span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* 2 columns on mobile, 2 on sm, 3 on md, 4 on lg/xl with large cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
                 {prods.map((product) => {
                   const qty = getItemCartQty(product.id);
                   const discountPercent = product.originalPrice
@@ -268,33 +269,49 @@ export const ShopDetail: React.FC = () => {
                     <div
                       key={product.id}
                       onClick={() => setSelectedProduct(product)}
-                      className="bg-white rounded-2xl border border-slate-200 p-3.5 hover:border-slate-400 hover:shadow-md transition-all flex gap-3.5 items-start cursor-pointer group shadow-xs"
+                      className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-2 sm:p-3 hover:border-slate-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group shadow-xs"
                     >
-                      <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                        <img
-                          src={product.image}
-                          alt={product.name}
-                          referrerPolicy="no-referrer"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                        {discountPercent > 0 && (
-                          <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-emerald-600 text-white font-bold text-[10px] rounded-md shadow-xs">
-                            {discountPercent}% OFF
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex-1 min-w-0 flex flex-col justify-between h-full space-y-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <span className={`w-2.5 h-2.5 rounded-sm border flex items-center justify-center ${
-                              product.isVeg ? 'border-emerald-600' : 'border-rose-600'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                product.isVeg ? 'bg-emerald-600' : 'bg-rose-600'
-                              }`} />
+                      <div>
+                        {/* Large, Prominent Product Image with consistent aspect ratio */}
+                        <div className="relative aspect-square w-full rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 mb-2 sm:mb-2.5">
+                          <img
+                            src={product.image}
+                            alt={product.name}
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                          {discountPercent > 0 && (
+                            <span className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 bg-emerald-600 text-white font-extrabold text-[9px] sm:text-[10px] rounded-md shadow-xs">
+                              {discountPercent}% OFF
                             </span>
-                            <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                          )}
+                          <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 bg-white/90 backdrop-blur-xs p-1 rounded-md shadow-xs">
+                            <span
+                              className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-xs border flex items-center justify-center ${
+                                product.isVeg ? 'border-emerald-600' : 'border-rose-600'
+                              }`}
+                            >
+                              <span
+                                className={`w-1.5 h-1.5 rounded-full ${
+                                  product.isVeg ? 'bg-emerald-600' : 'bg-rose-600'
+                                }`}
+                              />
+                            </span>
+                          </div>
+
+                          {!product.inStock && (
+                            <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex items-center justify-center p-2 text-center">
+                              <span className="bg-rose-500 text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md">
+                                Out of Stock
+                              </span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Product Info */}
+                        <div className="space-y-1 px-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] sm:text-[11px] text-slate-500 font-semibold uppercase">
                               {product.unit}
                             </span>
                           </div>
@@ -302,59 +319,60 @@ export const ShopDetail: React.FC = () => {
                           <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-2 group-hover:text-emerald-700 transition-colors leading-snug">
                             {product.name}
                           </h4>
-                          <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                          <p className="text-[11px] text-slate-500 line-clamp-1 hidden sm:block">
                             {product.description}
                           </p>
                         </div>
+                      </div>
 
-                        <div className="flex items-center justify-between pt-1">
-                          <div>
-                            <div className="flex items-baseline gap-1.5">
-                              <span className="font-extrabold text-slate-900 text-sm sm:text-base">
-                                ₹{product.price}
+                      {/* Price and Cart Controls */}
+                      <div className="flex items-center justify-between pt-2 mt-1.5 border-t border-slate-100 gap-1 px-0.5">
+                        <div className="min-w-0">
+                          <div className="flex items-baseline gap-1 sm:gap-1.5 flex-wrap">
+                            <span className="font-extrabold text-slate-900 text-xs sm:text-sm md:text-base">
+                              ₹{product.price}
+                            </span>
+                            {product.originalPrice && product.originalPrice > product.price && (
+                              <span className="text-[10px] sm:text-[11px] text-slate-400 line-through">
+                                ₹{product.originalPrice}
                               </span>
-                              {product.originalPrice && product.originalPrice > product.price && (
-                                <span className="text-[11px] text-slate-400 line-through">
-                                  ₹{product.originalPrice}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Add / Modifier Button */}
-                          <div onClick={(e) => e.stopPropagation()}>
-                            {qty > 0 ? (
-                              <div className="flex items-center border border-emerald-600 rounded-xl bg-emerald-50 p-0.5 shadow-xs">
-                                <button
-                                  type="button"
-                                  onClick={() => updateCartQuantity(product.id, -1)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
-                                >
-                                  <Minus className="w-3.5 h-3.5" />
-                                </button>
-                                <span className="w-7 text-center font-extrabold text-xs text-emerald-950">
-                                  {qty}
-                                </span>
-                                <button
-                                  type="button"
-                                  onClick={() => updateCartQuantity(product.id, 1)}
-                                  className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
-                                >
-                                  <Plus className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                disabled={!product.inStock}
-                                onClick={() => addToCart(product, 1)}
-                                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>{product.inStock ? 'Add' : 'Out'}</span>
-                              </button>
                             )}
                           </div>
+                        </div>
+
+                        {/* Add / Modifier Button */}
+                        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                          {qty > 0 ? (
+                            <div className="flex items-center border border-emerald-600 rounded-xl bg-emerald-50 p-0.5 shadow-xs">
+                              <button
+                                type="button"
+                                onClick={() => updateCartQuantity(product.id, -1)}
+                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
+                              >
+                                <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                              </button>
+                              <span className="w-5 sm:w-6 text-center font-extrabold text-xs text-emerald-950">
+                                {qty}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => updateCartQuantity(product.id, 1)}
+                                className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              disabled={!product.inStock}
+                              onClick={() => addToCart(product, 1)}
+                              className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                              <span>{product.inStock ? 'Add' : 'Out'}</span>
+                            </button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -365,8 +383,8 @@ export const ShopDetail: React.FC = () => {
           ))}
         </div>
       ) : (
-        /* Flat filtered grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        /* Flat filtered 2-column mobile grid */
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4">
           {filteredProducts.map((product) => {
             const qty = getItemCartQty(product.id);
             const discountPercent = product.originalPrice
@@ -377,33 +395,49 @@ export const ShopDetail: React.FC = () => {
               <div
                 key={product.id}
                 onClick={() => setSelectedProduct(product)}
-                className="bg-white rounded-2xl border border-slate-200 p-3.5 hover:border-slate-400 hover:shadow-md transition-all flex gap-3.5 items-start cursor-pointer group shadow-xs"
+                className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200 p-2 sm:p-3 hover:border-slate-400 hover:shadow-md transition-all flex flex-col justify-between cursor-pointer group shadow-xs"
               >
-                <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-xl overflow-hidden bg-slate-100 shrink-0">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    referrerPolicy="no-referrer"
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                  />
-                  {discountPercent > 0 && (
-                    <span className="absolute top-1.5 left-1.5 px-1.5 py-0.5 bg-emerald-600 text-white font-bold text-[10px] rounded-md shadow-xs">
-                      {discountPercent}% OFF
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0 flex flex-col justify-between h-full space-y-2">
-                  <div>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className={`w-2.5 h-2.5 rounded-sm border flex items-center justify-center ${
-                        product.isVeg ? 'border-emerald-600' : 'border-rose-600'
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                          product.isVeg ? 'bg-emerald-600' : 'bg-rose-600'
-                        }`} />
+                <div>
+                  {/* Large, Prominent Product Image with consistent aspect ratio */}
+                  <div className="relative aspect-square w-full rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 mb-2 sm:mb-2.5">
+                    <img
+                      src={product.image}
+                      alt={product.name}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    />
+                    {discountPercent > 0 && (
+                      <span className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 px-1.5 py-0.5 bg-emerald-600 text-white font-extrabold text-[9px] sm:text-[10px] rounded-md shadow-xs">
+                        {discountPercent}% OFF
                       </span>
-                      <span className="text-[10px] text-slate-500 font-semibold uppercase">
+                    )}
+                    <div className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 bg-white/90 backdrop-blur-xs p-1 rounded-md shadow-xs">
+                      <span
+                        className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-xs border flex items-center justify-center ${
+                          product.isVeg ? 'border-emerald-600' : 'border-rose-600'
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            product.isVeg ? 'bg-emerald-600' : 'bg-rose-600'
+                          }`}
+                        />
+                      </span>
+                    </div>
+
+                    {!product.inStock && (
+                      <div className="absolute inset-0 bg-white/80 backdrop-blur-2xs flex items-center justify-center p-2 text-center">
+                        <span className="bg-rose-500 text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-md">
+                          Out of Stock
+                        </span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Product Info */}
+                  <div className="space-y-1 px-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] sm:text-[11px] text-slate-500 font-semibold uppercase">
                         {product.unit}
                       </span>
                     </div>
@@ -411,58 +445,59 @@ export const ShopDetail: React.FC = () => {
                     <h4 className="font-bold text-slate-900 text-xs sm:text-sm line-clamp-2 group-hover:text-emerald-700 transition-colors leading-snug">
                       {product.name}
                     </h4>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
+                    <p className="text-[11px] text-slate-500 line-clamp-1 hidden sm:block">
                       {product.description}
                     </p>
                   </div>
+                </div>
 
-                  <div className="flex items-center justify-between pt-1">
-                    <div>
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="font-extrabold text-slate-900 text-sm sm:text-base">
-                          ₹{product.price}
+                {/* Price and Cart Controls */}
+                <div className="flex items-center justify-between pt-2 mt-1.5 border-t border-slate-100 gap-1 px-0.5">
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-1 sm:gap-1.5 flex-wrap">
+                      <span className="font-extrabold text-slate-900 text-xs sm:text-sm md:text-base">
+                        ₹{product.price}
+                      </span>
+                      {product.originalPrice && product.originalPrice > product.price && (
+                        <span className="text-[10px] sm:text-[11px] text-slate-400 line-through">
+                          ₹{product.originalPrice}
                         </span>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <span className="text-[11px] text-slate-400 line-through">
-                            ₹{product.originalPrice}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div onClick={(e) => e.stopPropagation()}>
-                      {qty > 0 ? (
-                        <div className="flex items-center border border-emerald-600 rounded-xl bg-emerald-50 p-0.5 shadow-xs">
-                          <button
-                            type="button"
-                            onClick={() => updateCartQuantity(product.id, -1)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="w-7 text-center font-extrabold text-xs text-emerald-950">
-                            {qty}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateCartQuantity(product.id, 1)}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={!product.inStock}
-                          onClick={() => addToCart(product, 1)}
-                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>{product.inStock ? 'Add' : 'Out'}</span>
-                        </button>
                       )}
                     </div>
+                  </div>
+
+                  <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                    {qty > 0 ? (
+                      <div className="flex items-center border border-emerald-600 rounded-xl bg-emerald-50 p-0.5 shadow-xs">
+                        <button
+                          type="button"
+                          onClick={() => updateCartQuantity(product.id, -1)}
+                          className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
+                        >
+                          <Minus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        </button>
+                        <span className="w-5 sm:w-6 text-center font-extrabold text-xs text-emerald-950">
+                          {qty}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateCartQuantity(product.id, 1)}
+                          className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center text-emerald-800 hover:bg-emerald-200 transition-colors font-bold cursor-pointer"
+                        >
+                          <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!product.inStock}
+                        onClick={() => addToCart(product, 1)}
+                        className="px-2.5 sm:px-3 py-1 sm:py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                        <span>{product.inStock ? 'Add' : 'Out'}</span>
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>

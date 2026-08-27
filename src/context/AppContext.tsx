@@ -26,7 +26,20 @@ import {
   INITIAL_DELIVERY_PARTNERS,
   INITIAL_TRANSACTIONS,
 } from '../data/mockData';
-import { deliveryService, cartService } from '../services';
+import {
+  deliveryService,
+  cartService,
+  authService,
+  shopService,
+  productService,
+  customerService,
+  orderService,
+  adminService,
+  shopkeeperService,
+  transactionService,
+  storageService,
+  isSupabaseConfigured,
+} from '../services';
 
 interface LocationState {
   area: string;
@@ -417,6 +430,88 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem(STORAGE_KEY_ADDRESSES, JSON.stringify(addresses));
   }, [addresses]);
 
+  // Hydrate data from Supabase backend if configured
+  useEffect(() => {
+    if (!isSupabaseConfigured()) return;
+
+    let isMounted = true;
+
+    const hydrateFromSupabase = async () => {
+      try {
+        const [
+          remoteShops,
+          remoteProducts,
+          remoteZones,
+          remotePartners,
+          remoteOrders,
+          remoteTransactions,
+          remoteUsers,
+        ] = await Promise.all([
+          shopService.fetchShops(),
+          productService.fetchProducts(),
+          deliveryService.fetchDeliveryZones(),
+          deliveryService.fetchDeliveryPartners(),
+          orderService.fetchOrders(),
+          transactionService.fetchTransactions(),
+          adminService.fetchUsers(),
+        ]);
+
+        if (!isMounted) return;
+
+        if (remoteShops && remoteShops.length > 0) setShops(remoteShops);
+        if (remoteProducts && remoteProducts.length > 0) setProducts(remoteProducts);
+        if (remoteZones && remoteZones.length > 0) setDeliveryZones(remoteZones);
+        if (remotePartners && remotePartners.length > 0) setDeliveryPartners(remotePartners);
+        if (remoteOrders && remoteOrders.length > 0) setOrders(remoteOrders);
+        if (remoteTransactions && remoteTransactions.length > 0) setTransactions(remoteTransactions);
+        if (remoteUsers && remoteUsers.length > 0) setUsers(remoteUsers);
+      } catch (err) {
+        console.warn('Supabase data synchronization note:', err);
+      }
+    };
+
+    hydrateFromSupabase();
+
+    // Check active session on startup
+    authService.getSession().then(async (session) => {
+      if (!isMounted) return;
+      if (session?.user) {
+        const profile = await authService.getProfile(session.user.id);
+        if (profile && isMounted) {
+          setCurrentUser(profile);
+          setCurrentRole(profile.role);
+          const addrs = await customerService.fetchAddresses(profile.id);
+          if (addrs.length > 0 && isMounted) setAddresses(addrs);
+          const favs = await customerService.fetchFavoriteShopIds(profile.id);
+          if (favs.length > 0 && isMounted) setFavoriteShopIds(favs);
+        }
+      }
+    });
+
+    const { unsubscribe } = authService.onAuthStateChange(async (event, session) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_IN' && session?.user) {
+        const profile = await authService.getProfile(session.user.id);
+        if (profile && isMounted) {
+          setCurrentUser(profile);
+          setCurrentRole(profile.role);
+          const addrs = await customerService.fetchAddresses(profile.id);
+          if (addrs.length > 0 && isMounted) setAddresses(addrs);
+          const favs = await customerService.fetchFavoriteShopIds(profile.id);
+          if (favs.length > 0 && isMounted) setFavoriteShopIds(favs);
+        }
+      } else if (event === 'SIGNED_OUT' && isMounted) {
+        setCurrentUser(null);
+        setCurrentRole('customer');
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
+  }, []);
+
   // Toast Helpers
   const addToast = (type: 'success' | 'error' | 'warning' | 'info', title: string, message?: string) => {
     const id = 'toast-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6);
@@ -456,6 +551,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const logoutUser = () => {
+    if (isSupabaseConfigured()) {
+      authService.signOut().catch((e) => console.warn('Supabase signout warning:', e));
+    }
     setCurrentUser(null);
     setCurrentRole('customer');
     setAuthView(null);
@@ -481,6 +579,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentUser(adminUser);
       setCurrentRole('admin');
       setAuthView(null);
+
+      if (isSupabaseConfigured()) {
+        authService.signInWithPassword('admin@homesale.local', password).catch(() => {});
+      }
+
       addToast('success', 'Admin Authenticated', 'Welcome to HOMESALE Administration Panel.');
       return { success: true };
     }
@@ -609,6 +712,32 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) => [newUser, ...prev]);
     setProducts((prev) => [...sampleProducts, ...prev]);
 
+    // Persist to Supabase if configured
+    if (isSupabaseConfigured()) {
+      authService
+        .signUp(data.ownerEmail.trim(), data.password, {
+          name: `${data.ownerName.trim()} (${data.shopName.trim()})`,
+          phone: data.ownerPhone.trim(),
+          role: 'shopkeeper',
+          status: 'pending',
+          avatarUrl: newShop.logo,
+        })
+        .then(async (res) => {
+          const ownerIdToUse = res.user?.id || userId;
+          await shopService.createShop({
+            ...newShop,
+            ownerId: ownerIdToUse,
+          });
+          for (const sp of sampleProducts) {
+            await productService.createProduct({
+              ...sp,
+              shopId,
+            });
+          }
+        })
+        .catch((err) => console.warn('Supabase shopkeeper registration sync warning:', err));
+    }
+
     addToast('info', 'Registration Submitted', 'Your shop is waiting for Admin approval.');
     return {
       success: true,
@@ -663,6 +792,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(userToLogin);
     setCurrentRole('shopkeeper');
     setAuthView(null);
+
+    if (isSupabaseConfigured() && userToLogin.email) {
+      authService.signInWithPassword(userToLogin.email, password).catch(() => {});
+    }
+
     addToast('success', 'Shopkeeper Login Successful', `Welcome to ${matchedShop?.name || userToLogin.name}!`);
     return { success: true };
   };
@@ -732,6 +866,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDeliveryPartners((prev) => [newPartner, ...prev]);
     setUsers((prev) => [newUser, ...prev]);
 
+    if (isSupabaseConfigured()) {
+      authService
+        .signUp(data.email.trim(), data.password, {
+          name: data.name.trim(),
+          phone: data.phone.trim(),
+          role: 'delivery',
+          status: 'pending',
+          avatarUrl: newPartner.avatarUrl,
+        })
+        .then(async (res) => {
+          const riderId = res.user?.id || partnerId;
+          await deliveryService.createDeliveryPartner({
+            ...newPartner,
+            id: riderId,
+          });
+        })
+        .catch((err) => console.warn('Supabase rider registration sync warning:', err));
+    }
+
     addToast('info', 'Application Submitted', 'Your account is waiting for Admin approval.');
     return {
       success: true,
@@ -787,6 +940,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCurrentUser(userToLogin);
     setCurrentRole('delivery');
     setAuthView(null);
+
+    if (isSupabaseConfigured() && userToLogin.email) {
+      authService.signInWithPassword(userToLogin.email, password).catch(() => {});
+    }
+
     addToast('success', 'Rider Authenticated', `Welcome back, ${matchedPartner?.name || userToLogin.name}!`);
     return { success: true };
   };
@@ -803,14 +961,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (matched) {
       loginUser(matched);
+      if (isSupabaseConfigured() && password && matched.email) {
+        authService.signInWithPassword(matched.email, password).catch(() => {});
+      }
       return { success: true };
     }
 
     // Fallback: auto-create if not found for seamless customer checkout
+    const emailToUse = usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@example.com`;
     const newCust: User = {
       id: 'user-customer-' + Date.now(),
       name: usernameOrEmail.includes('@') ? usernameOrEmail.split('@')[0] : usernameOrEmail,
-      email: usernameOrEmail.includes('@') ? usernameOrEmail : `${usernameOrEmail}@example.com`,
+      email: emailToUse,
       phone: '+91 98765 00000',
       role: 'customer',
       username: usernameOrEmail,
@@ -819,6 +981,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setUsers((prev) => [newCust, ...prev]);
     loginUser(newCust);
+
+    if (isSupabaseConfigured()) {
+      authService
+        .signUp(emailToUse, password || 'customer@123', {
+          name: newCust.name,
+          phone: newCust.phone,
+          role: 'customer',
+          status: 'active',
+        })
+        .catch(() => {});
+    }
+
     return { success: true };
   };
 
@@ -838,6 +1012,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
     setUsers((prev) => [newCust, ...prev]);
     loginUser(newCust);
+
+    if (isSupabaseConfigured()) {
+      authService
+        .signUp(email.trim(), password || 'customer@123', {
+          name,
+          phone,
+          role: 'customer',
+          status: 'active',
+        })
+        .catch((err) => console.warn('Supabase customer registration notice:', err));
+    }
+
     return { success: true };
   };
 
@@ -850,17 +1036,31 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.shopId === shopId || u.id === shops.find((s) => s.id === shopId)?.ownerId ? { ...u, approvalStatus: 'active' } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, { status: 'active', isVerified: true }).catch(() => {});
+      const ownerId = shops.find((s) => s.id === shopId)?.ownerId;
+      if (ownerId) adminService.updateUserStatus(ownerId, 'active').catch(() => {});
+    }
+
     const sName = shops.find((s) => s.id === shopId)?.name || 'Shop';
     addToast('success', 'Shop Approved', `${sName} is now active and can receive customer orders.`);
   };
 
   const adminRejectShop = (shopId: string, reason?: string) => {
     setShops((prev) =>
-      prev.map((s) => (s.id === shopId ? { ...s, status: 'rejected' } : s))
+      prev.map((s) => (s.id === shopId ? { ...s, status: 'rejected', rejectionReason: reason } : s))
     );
     setUsers((prev) =>
-      prev.map((u) => (u.shopId === shopId || u.id === shops.find((s) => s.id === shopId)?.ownerId ? { ...u, approvalStatus: 'rejected' } : u))
+      prev.map((u) => (u.shopId === shopId || u.id === shops.find((s) => s.id === shopId)?.ownerId ? { ...u, approvalStatus: 'rejected', rejectionReason: reason } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, { status: 'rejected', rejectionReason: reason }).catch(() => {});
+      const ownerId = shops.find((s) => s.id === shopId)?.ownerId;
+      if (ownerId) adminService.updateUserStatus(ownerId, 'rejected', reason).catch(() => {});
+    }
+
     const sName = shops.find((s) => s.id === shopId)?.name || 'Shop';
     addToast('warning', 'Shop Application Rejected', reason || `${sName} registration was rejected.`);
   };
@@ -872,6 +1072,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.shopId === shopId || u.id === shops.find((s) => s.id === shopId)?.ownerId ? { ...u, approvalStatus: 'suspended' } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, { status: 'suspended' }).catch(() => {});
+      const ownerId = shops.find((s) => s.id === shopId)?.ownerId;
+      if (ownerId) adminService.updateUserStatus(ownerId, 'suspended').catch(() => {});
+    }
+
     const sName = shops.find((s) => s.id === shopId)?.name || 'Shop';
     addToast('info', 'Shop Suspended', `${sName} is now suspended from the marketplace.`);
   };
@@ -883,6 +1090,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.shopId === shopId || u.id === shops.find((s) => s.id === shopId)?.ownerId ? { ...u, approvalStatus: 'active' } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, { status: 'active' }).catch(() => {});
+      const ownerId = shops.find((s) => s.id === shopId)?.ownerId;
+      if (ownerId) adminService.updateUserStatus(ownerId, 'active').catch(() => {});
+    }
+
     const sName = shops.find((s) => s.id === shopId)?.name || 'Shop';
     addToast('success', 'Shop Activated', `${sName} is active.`);
   };
@@ -894,17 +1108,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.id === partnerId ? { ...u, approvalStatus: 'active' } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      deliveryService.updateDeliveryPartner(partnerId, { approvalStatus: 'active', status: 'active' }).catch(() => {});
+      adminService.updateUserStatus(partnerId, 'active').catch(() => {});
+    }
+
     const dpName = deliveryPartners.find((dp) => dp.id === partnerId)?.name || 'Rider';
     addToast('success', 'Rider Approved', `${dpName} has been approved and can now accept delivery tasks.`);
   };
 
   const adminRejectDeliveryPartner = (partnerId: string, reason?: string) => {
     setDeliveryPartners((prev) =>
-      prev.map((dp) => (dp.id === partnerId ? { ...dp, approvalStatus: 'rejected', status: 'offline' } : dp))
+      prev.map((dp) => (dp.id === partnerId ? { ...dp, approvalStatus: 'rejected', status: 'offline', rejectionReason: reason } : dp))
     );
     setUsers((prev) =>
-      prev.map((u) => (u.id === partnerId ? { ...u, approvalStatus: 'rejected' } : u))
+      prev.map((u) => (u.id === partnerId ? { ...u, approvalStatus: 'rejected', rejectionReason: reason } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      deliveryService.updateDeliveryPartner(partnerId, { approvalStatus: 'rejected', status: 'offline', rejectionReason: reason }).catch(() => {});
+      adminService.updateUserStatus(partnerId, 'rejected', reason).catch(() => {});
+    }
+
     const dpName = deliveryPartners.find((dp) => dp.id === partnerId)?.name || 'Rider';
     addToast('warning', 'Rider Application Rejected', reason || `${dpName} application was rejected.`);
   };
@@ -916,6 +1142,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.id === partnerId ? { ...u, approvalStatus: 'suspended' } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      deliveryService.updateDeliveryPartner(partnerId, { approvalStatus: 'suspended', status: 'offline' }).catch(() => {});
+      adminService.updateUserStatus(partnerId, 'suspended').catch(() => {});
+    }
+
     const dpName = deliveryPartners.find((dp) => dp.id === partnerId)?.name || 'Rider';
     addToast('info', 'Rider Account Suspended', `${dpName} is suspended.`);
   };
@@ -927,9 +1159,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.id === partnerId ? { ...u, approvalStatus: 'active' } : u))
     );
+
+    if (isSupabaseConfigured()) {
+      deliveryService.updateDeliveryPartner(partnerId, { approvalStatus: 'active', status: 'active' }).catch(() => {});
+      adminService.updateUserStatus(partnerId, 'active').catch(() => {});
+    }
+
     const dpName = deliveryPartners.find((dp) => dp.id === partnerId)?.name || 'Rider';
     addToast('success', 'Rider Account Activated', `${dpName} is now active.`);
   };
+
 
   // Location handler
   const checkPincode = (pincode: string) => {
@@ -1074,13 +1313,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Favorites
   const toggleFavoriteShop = (shopId: string) => {
     setFavoriteShopIds((prev) => {
-      if (prev.includes(shopId)) {
+      const isFav = prev.includes(shopId);
+      const next = isFav ? prev.filter((id) => id !== shopId) : [...prev, shopId];
+      if (isSupabaseConfigured() && currentUser?.id) {
+        customerService.toggleFavoriteShop(currentUser.id, shopId, isFav).catch(() => {});
+      }
+      if (isFav) {
         addToast('info', 'Removed from favorites');
-        return prev.filter((id) => id !== shopId);
       } else {
         addToast('success', 'Added to favorite shops', 'You can quickly access this shop from Favorites.');
-        return [...prev, shopId];
       }
+      return next;
     });
   };
 
@@ -1101,6 +1344,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } else {
       setAddresses((prev) => [...prev, created]);
     }
+
+    if (isSupabaseConfigured() && currentUser?.id) {
+      customerService.createAddress(currentUser.id, created).catch(() => {});
+    }
+
     addToast('success', 'Address added successfully');
     return created;
   };
@@ -1117,6 +1365,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         return addr;
       })
     );
+
+    if (isSupabaseConfigured()) {
+      customerService.updateAddress(id, updates).catch(() => {});
+    }
+
     addToast('success', 'Address updated');
   };
 
@@ -1128,6 +1381,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
       return filtered;
     });
+
+    if (isSupabaseConfigured()) {
+      customerService.deleteAddress(id).catch(() => {});
+    }
+
     addToast('info', 'Address deleted');
   };
 
@@ -1206,15 +1464,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearCart();
     setCustomerView('order-tracking');
 
+    if (isSupabaseConfigured()) {
+      orderService.createOrder(newOrder).catch((e) => console.warn('Supabase create order notice:', e));
+    }
+
     addToast('success', 'Order Placed Successfully!', `Order ${orderNumber} is now sent to ${shop.name}`);
     return newOrder;
   };
 
   const updateOrderStatus = (orderId: string, status: OrderStatus, note?: string) => {
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
-          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           return {
             ...ord,
             orderStatus: status,
@@ -1239,6 +1501,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
+    if (isSupabaseConfigured()) {
+      orderService.updateOrderStatus(orderId, status, note).catch(() => {});
+    }
+
     addToast('info', `Order ${status}`, note || `Order updated to ${status}`);
   };
 
@@ -1257,6 +1523,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShops((prev) =>
       prev.map((s) => (s.id === shopId ? { ...s, ...updates } : s))
     );
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, updates).catch(() => {});
+    }
     addToast('success', 'Shop details updated successfully');
   };
 
@@ -1267,6 +1536,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       id,
     };
     setProducts((prev) => [created, ...prev]);
+
+    if (isSupabaseConfigured()) {
+      productService.createProduct(created).catch(() => {});
+    }
+
     addToast('success', 'Product added to catalogue', created.name);
     return created;
   };
@@ -1275,20 +1549,42 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setProducts((prev) =>
       prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
     );
+
+    if (isSupabaseConfigured()) {
+      productService.updateProduct(id, updates).catch(() => {});
+    }
+
     addToast('success', 'Product updated');
   };
 
   const deleteProduct = (id: string) => {
     setProducts((prev) => prev.filter((p) => p.id !== id));
+
+    if (isSupabaseConfigured()) {
+      productService.deleteProduct(id).catch(() => {});
+    }
+
     addToast('info', 'Product removed from catalogue');
   };
 
   const toggleProductStock = (id: string) => {
+    let nextStock = false;
     setProducts((prev) =>
-      prev.map((p) => (p.id === id ? { ...p, inStock: !p.inStock } : p))
+      prev.map((p) => {
+        if (p.id === id) {
+          nextStock = !p.inStock;
+          return { ...p, inStock: nextStock };
+        }
+        return p;
+      })
     );
+
+    if (isSupabaseConfigured()) {
+      productService.toggleStock(id, nextStock).catch(() => {});
+    }
+
     const prod = products.find((p) => p.id === id);
-    addToast('info', 'Stock status updated', `${prod?.name}: ${!prod?.inStock ? 'In Stock' : 'Out of Stock'}`);
+    addToast('info', 'Stock status updated', `${prod?.name}: ${nextStock ? 'In Stock' : 'Out of Stock'}`);
   };
 
   // Delivery Partner Actions
@@ -1298,10 +1594,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const acceptDelivery = (orderId: string, partnerId: string) => {
     const partner = deliveryPartners.find((dp) => dp.id === partnerId) || currentDeliveryPartner;
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     setOrders((prev) =>
       prev.map((ord) => {
         if (ord.id === orderId) {
-          const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
           return {
             ...ord,
             deliveryPartnerId: partner.id,
@@ -1322,6 +1618,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((dp) => (dp.id === partnerId ? { ...dp, status: 'on_delivery', currentOrderId: orderId } : dp))
     );
 
+    if (isSupabaseConfigured()) {
+      orderService.assignDeliveryPartner(orderId, partner.id, partner.name, partner.phone).catch(() => {});
+      deliveryService.updateDeliveryPartner(partner.id, { status: 'on_delivery' }).catch(() => {});
+    }
+
     addToast('success', 'Delivery Task Accepted', `Head to pickup shop to collect package.`);
   };
 
@@ -1341,16 +1642,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       })
     );
 
+    if (isSupabaseConfigured()) {
+      orderService.updateOrderStatus(orderId, status).catch(() => {});
+    }
+
     if (status === 'Delivered') {
       setDeliveryPartners((prev) =>
         prev.map((dp) => {
           if (dp.currentOrderId === orderId || dp.id === currentUser?.id) {
+            const nextEarnings = dp.todayEarnings + 45;
+            if (isSupabaseConfigured()) {
+              deliveryService.updateDeliveryPartner(dp.id, {
+                status: 'active',
+                todayEarnings: nextEarnings,
+                totalEarnings: dp.totalEarnings + 45,
+                totalDeliveries: dp.totalDeliveries + 1,
+              }).catch(() => {});
+            }
             return {
               ...dp,
               status: 'active',
               currentOrderId: undefined,
               totalDeliveries: dp.totalDeliveries + 1,
-              todayEarnings: dp.todayEarnings + 45,
+              todayEarnings: nextEarnings,
               totalEarnings: dp.totalEarnings + 45,
             };
           }
@@ -1442,6 +1756,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShops((prev) => [created, ...prev]);
     setUsers((prev) => [shopkeeperUser, ...prev]);
     setProducts((prev) => [starterProduct, ...prev]);
+
+    if (isSupabaseConfigured()) {
+      shopService.createShop(created).catch(() => {});
+      productService.createProduct(starterProduct).catch(() => {});
+    }
+
     addToast('success', 'Shop Created & Assigned', `${created.name} registered into HOMESALE. Shopkeeper login: ${username}`);
     return created;
   };
@@ -1450,6 +1770,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShops((prev) =>
       prev.map((s) => (s.id === shopId ? { ...s, ...updates } : s))
     );
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, updates).catch(() => {});
+    }
     addToast('success', 'Shop Updated', 'Shop information updated successfully.');
   };
 
@@ -1496,6 +1819,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return [newUser, ...filtered];
     });
 
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, {
+        ownerId,
+        ownerName: data.name,
+        ownerPhone: data.phone,
+        ownerEmail: data.email,
+        username: data.username,
+      }).catch(() => {});
+    }
+
     addToast('success', 'Shopkeeper Assigned', `${data.name} (${data.username}) is now managing ${shop.name}`);
   };
 
@@ -1503,6 +1836,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setShops((prev) =>
       prev.map((s) => (s.id === shopId ? { ...s, status } : s))
     );
+    if (isSupabaseConfigured()) {
+      shopService.updateShop(shopId, { status }).catch(() => {});
+    }
     addToast('info', 'Shop Status Updated', `Status changed to ${status}.`);
   };
 
@@ -1512,6 +1848,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setUsers((prev) =>
       prev.map((u) => (u.shopId === shopId ? { ...u, shopId: undefined } : u))
     );
+    if (isSupabaseConfigured()) {
+      shopService.deleteShop(shopId).catch(() => {});
+    }
     addToast('warning', 'Shop Removed', 'Shop and associated products deleted.');
   };
 
@@ -1519,6 +1858,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const id = 'zone-' + Date.now();
     const created: DeliveryZone = { ...zone, id };
     setDeliveryZones((prev) => [...prev, created]);
+
+    if (isSupabaseConfigured()) {
+      deliveryService.createDeliveryZone(created).catch(() => {});
+    }
+
     addToast('success', 'Delivery Zone Added', created.name);
   };
 
@@ -1526,11 +1870,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDeliveryZones((prev) =>
       prev.map((z) => (z.id === id ? { ...z, ...zoneUpdates } : z))
     );
+
+    if (isSupabaseConfigured()) {
+      deliveryService.updateDeliveryZone(id, zoneUpdates).catch(() => {});
+    }
+
     addToast('success', 'Delivery Zone Updated');
   };
 
   const adminDeleteDeliveryZone = (id: string) => {
     setDeliveryZones((prev) => prev.filter((z) => z.id !== id));
+
+    if (isSupabaseConfigured()) {
+      deliveryService.deleteDeliveryZone(id).catch(() => {});
+    }
+
     addToast('info', 'Delivery Zone Deleted');
   };
 
@@ -1583,6 +1937,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setDeliveryPartners((prev) => [newPartner, ...prev]);
     setUsers((prev) => [newUser, ...prev]);
+
+    if (isSupabaseConfigured()) {
+      deliveryService.createDeliveryPartner(newPartner).catch(() => {});
+    }
+
     addToast('success', 'Delivery Partner Added', `${data.name} registered with username ${data.username}`);
   };
 
@@ -1590,14 +1949,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setDeliveryPartners((prev) =>
       prev.map((dp) => (dp.id === id ? { ...dp, ...updates } : dp))
     );
+
+    if (isSupabaseConfigured()) {
+      deliveryService.updateDeliveryPartner(id, updates).catch(() => {});
+    }
+
     addToast('success', 'Delivery Partner Updated');
   };
 
   const adminDeleteDeliveryPartner = (id: string) => {
     setDeliveryPartners((prev) => prev.filter((dp) => dp.id !== id));
     setUsers((prev) => prev.filter((u) => u.id !== id));
+
+    if (isSupabaseConfigured()) {
+      deliveryService.deleteDeliveryPartner(id).catch(() => {});
+    }
+
     addToast('info', 'Delivery Partner Removed', 'Rider deleted from platform.');
   };
+
 
   return (
     <AppContext.Provider
